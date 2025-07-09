@@ -2,30 +2,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
-from babel.numbers import format_currency
 
-# Set gaya visual
+# ===============================
+# Set gaya visual dan tema
+# ===============================
 sns.set(style='dark')
+st.set_page_config(layout="wide")
 
 # ===============================
-# Fungsi-fungsi pengolahan data
+# Fungsi pemrosesan data
 # ===============================
-
 def get_total_count_by_hour_df(hour_df):
     return hour_df.groupby("hours").agg({"count_rent": "sum"}).reset_index()
-
-def count_by_day_df(day_df):
-    return day_df.query('dteday >= "2011-01-01" and dteday < "2012-12-31"')
-
-def total_registered_df(day_df):
-    reg_df = day_df.groupby("dteday").agg({"registered": "sum"}).reset_index()
-    reg_df.rename(columns={"registered": "register_sum"}, inplace=True)
-    return reg_df
-
-def total_casual_df(day_df):
-    cas_df = day_df.groupby("dteday").agg({"casual": "sum"}).reset_index()
-    cas_df.rename(columns={"casual": "casual_sum"}, inplace=True)
-    return cas_df
 
 def sum_order(hour_df):
     return hour_df.groupby("hours").agg({"count_rent": "sum"}).sort_values(by="count_rent", ascending=False).reset_index()
@@ -39,178 +27,191 @@ def sum_of_weather(day_df):
 # ===============================
 # Load dan siapkan data
 # ===============================
-
 days_df = pd.read_csv("dashboard/day_clean.csv")
 hours_df = pd.read_csv("dashboard/hour_clean.csv")
 
-# Konversi tanggal
-for col in ["dteday"]:
-    days_df[col] = pd.to_datetime(days_df[col])
-    hours_df[col] = pd.to_datetime(hours_df[col])
+days_df["dteday"] = pd.to_datetime(days_df["dteday"])
+hours_df["dteday"] = pd.to_datetime(hours_df["dteday"])
 
-# Sortir data berdasarkan tanggal
 days_df.sort_values("dteday", inplace=True)
 hours_df.sort_values("dteday", inplace=True)
 
-# ===============================
-# Sidebar - filter tanggal
-# ===============================
+# Mapping kategori
+season_order = ["Spring", "Summer", "Fall", "Winter"]
+season_colors = {
+    "Spring": "#AED581", "Summer": "#FFEE58", "Fall": "#FF8A65", "Winter": "#90CAF9"
+}
+weather_order = ["Clear", "Mist", "Light_Rainsnow", "Heavy_Rainsnow"]
+weather_colors = {
+    "Clear": "#FFD54F", "Mist": "#B0BEC5", "Light_Rainsnow": "#81D4FA", "Heavy_Rainsnow": "#455A64"
+}
+day_colors = {"weekday": "#455A64", "weekend": "#1D2122"}
 
+# ===============================
+# Sidebar - Filter Tanggal
+# ===============================
 with st.sidebar:
     st.image("https://storage.googleapis.com/gweb-uniblog-publish-prod/original_images/image1_hH9B4gs.jpg")
+    start_date, end_date = st.date_input("Rentang Tanggal", [days_df["dteday"].min(), days_df["dteday"].max()])
 
-    min_date_days = days_df["dteday"].min()
-    max_date_days = days_df["dteday"].max()
-
-    start_date, end_date = st.date_input(
-        label="Rentang Waktu",
-        min_value=min_date_days,
-        max_value=max_date_days,
-        value=[min_date_days, max_date_days]
-    )
+main_df_days = days_df[(days_df["dteday"] >= pd.to_datetime(start_date)) & (days_df["dteday"] <= pd.to_datetime(end_date))]
+main_df_hour = hours_df[(hours_df["dteday"] >= pd.to_datetime(start_date)) & (hours_df["dteday"] <= pd.to_datetime(end_date))]
 
 # ===============================
-# Filter data berdasarkan input
+# Header Dashboard
 # ===============================
-
-main_df_days = days_df[(days_df["dteday"] >= pd.to_datetime(start_date)) & 
-                       (days_df["dteday"] <= pd.to_datetime(end_date))]
-main_df_hour = hours_df[(hours_df["dteday"] >= pd.to_datetime(start_date)) & 
-                        (hours_df["dteday"] <= pd.to_datetime(end_date))]
+st.title("📊 Bike Sharing Dashboard")
+st.markdown("Analisis peminjaman sepeda berdasarkan musim, cuaca, jam, dan perilaku pengguna.")
 
 # ===============================
-# Proses data
-# ===============================
-
-hour_count_df = get_total_count_by_hour_df(main_df_hour)
-day_df_count_2011 = count_by_day_df(main_df_days)
-reg_df = total_registered_df(main_df_days)
-cas_df = total_casual_df(main_df_days)
-sum_order_items_df = sum_order(main_df_hour)
-season_df = sum_of_season(main_df_days)
-weather_df = sum_of_weather(main_df_days)
-
-# ===============================
-# Tampilan utama dashboard
-# ===============================
-
-st.header("Bike Sharing :sparkles:")
-st.subheader("Daily Rental")
-
-# ===============================
-# Kartu informasi utama
+# Informasi Ringkasan
 # ===============================
 col1, col2, col3 = st.columns(3)
-
 with col1:
-    total_orders = day_df_count_2011["count_rent"].sum()
-    st.metric("Total Sharing Bike", value=total_orders)
-
+    st.metric("Total Peminjaman", main_df_days["count_rent"].sum())
 with col2:
-    total_sum = reg_df["register_sum"].sum()
-    st.metric("Total Registered", value=total_sum)
-
+    st.metric("Total Registered", main_df_days["registered"].sum())
 with col3:
-    total_sum = cas_df["casual_sum"].sum()
-    st.metric("Total Casual", value=total_sum)
+    st.metric("Total Casual", main_df_days["casual"].sum())
 
 # ===============================
-# Line chart: peminjaman harian
+# Bar chart: Musim
 # ===============================
-st.subheader("Performa penjualan dalam beberapa tahun terakhir")
-fig, ax = plt.subplots(figsize=(16, 8))
-ax.plot(
-    days_df["dteday"],
-    days_df["count_rent"],
-    marker='o',
-    linewidth=2,
-    color="#90CAF9"
-)
-ax.tick_params(axis='y', labelsize=20)
-ax.tick_params(axis='x', labelsize=15)
-ax.set_ylabel("Jumlah Peminjaman")
-ax.set_xlabel("Tanggal")
-st.pyplot(fig)
-
-# ===============================
-# Bar chart: jam tersibuk dan sepi
-# ===============================
-st.subheader("Jam paling banyak dan paling sedikit penyewaan")
-fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(35, 15))
-
-# Jam tersibuk
-sns.barplot(x="hours", y="count_rent", data=sum_order_items_df.head(5), palette=["#D3D3D3", "#D3D3D3", "#90CAF9", "#D3D3D3", "#D3D3D3"], ax=ax[0])
-ax[0].set_title("Jam dengan Banyak Penyewaan", fontsize=30)
-ax[0].set_xlabel("Jam (PM)", fontsize=20)
-ax[0].tick_params(axis='x', labelsize=20)
-ax[0].tick_params(axis='y', labelsize=25)
-
-# Jam paling sepi
-sns.barplot(x="hours", y="count_rent", data=sum_order_items_df.sort_values(by="count_rent", ascending=True).head(5), palette=["#90CAF9"] + ["#D3D3D3"]*4, ax=ax[1])
-ax[1].set_title("Jam dengan Sedikit Penyewaan", fontsize=30)
-ax[1].set_xlabel("Jam (AM)", fontsize=20)
-ax[1].invert_xaxis()
-ax[1].yaxis.set_label_position("right")
-ax[1].yaxis.tick_right()
-ax[1].tick_params(axis='x', labelsize=20)
-ax[1].tick_params(axis='y', labelsize=25)
-
-st.pyplot(fig)
-
-# ===============================
-# Bar chart: musim
-# ===============================
-st.subheader("Musim dengan Penyewaan Terbanyak")
-colors = ["#D3D3D3", "#D3D3D3", "#90CAF9", "#D3D3D3"]
+st.subheader("🎨 Tren Peminjaman Berdasarkan Musim")
 fig, ax = plt.subplots(figsize=(20, 10))
 sns.barplot(
+    data=main_df_days,
     x="season",
     y="count_rent",
-    data=season_df.sort_values(by="season", ascending=False),
-    palette=colors,
+    hue="season",
+    palette=season_colors,
+    order=season_order,
+    legend=False,
     ax=ax
 )
-ax.set_title("Penyewaan Berdasarkan Musim", fontsize=40)
-ax.tick_params(axis='x', labelsize=30)
-ax.tick_params(axis='y', labelsize=25)
+ax.set_title("Peminjaman Sepeda per Musim", fontsize=35, fontweight='bold')
+ax.set_xlabel("Musim", fontsize=20)
+ax.set_ylabel("Jumlah Peminjaman", fontsize=20)
+plt.tight_layout()
 st.pyplot(fig)
 
 # ===============================
-# Bar chart: kondisi cuaca
+# Bar chart: Cuaca
 # ===============================
-st.subheader("Penyewaan Berdasarkan Kondisi Cuaca")
+st.subheader("☁️ Tren Peminjaman Berdasarkan Cuaca")
 fig, ax = plt.subplots(figsize=(20, 10))
 sns.barplot(
+    data=main_df_days,
     x="weather_situation",
     y="count_rent",
-    data=weather_df.sort_values(by="count_rent", ascending=False),
-    palette="Blues",
+    hue="weather_situation",
+    palette=weather_colors,
+    order=weather_order,
+    legend=False,
     ax=ax
 )
-ax.set_title("Penyewaan Berdasarkan Cuaca", fontsize=40)
-ax.set_xlabel("Kondisi Cuaca", fontsize=25)
-ax.set_ylabel("Jumlah Peminjaman", fontsize=25)
-ax.tick_params(axis='x', labelsize=20)
-ax.tick_params(axis='y', labelsize=20)
+ax.set_title("Peminjaman Sepeda per Kondisi Cuaca", fontsize=35, fontweight='bold')
+ax.set_xlabel("Cuaca", fontsize=20)
+ax.set_ylabel("Jumlah Peminjaman", fontsize=20)
+plt.tight_layout()
 st.pyplot(fig)
 
 # ===============================
-# Pie chart: registered vs casual
+# Pointplot: Jam per Hari
 # ===============================
-st.subheader("Perbandingan Pengguna Registered dan Casual")
-labels = 'casual', 'registered'
-sizes = [cas_df["casual_sum"].sum(), reg_df["register_sum"].sum()]
-explode = (0, 0.1)
+st.subheader("⏰ Peminjaman per Jam (Weekday vs Weekend)")
+fig, ax = plt.subplots(figsize=(20, 10))
+sns.pointplot(data=main_df_hour, x="hours", y="count_rent", hue="category_days", palette="Set1", ax=ax)
+ax.set_title("Peminjaman Sepeda Berdasarkan Hari dan Jam", fontsize=35)
+ax.set_xlabel("Jam", fontsize=20)
+ax.set_ylabel("Jumlah Peminjaman", fontsize=20)
+plt.tight_layout()
+st.pyplot(fig)
 
-fig1, ax1 = plt.subplots()
-ax1.pie(
-    sizes,
-    explode=explode,
-    labels=labels,
-    autopct='%1.1f%%',
-    colors=["#D3D3D3", "#90CAF9"],
-    shadow=True,
-    startangle=90
-)
-ax1.axis('equal')
-st.pyplot(fig1)
+# ===============================
+# Bar chart: Weekday vs Weekend
+# ===============================
+st.subheader("📅 Peminjaman Berdasarkan Jenis Hari")
+fig, ax = plt.subplots(figsize=(20, 10))
+sns.barplot(data=main_df_days, x="category_days", y="count_rent", palette=day_colors, ax=ax)
+ax.set_title("Jumlah Peminjaman Weekday vs Weekend", fontsize=35)
+ax.set_xlabel("Jenis Hari", fontsize=20)
+ax.set_ylabel("Jumlah Peminjaman", fontsize=20)
+plt.tight_layout()
+st.pyplot(fig)
+
+# ===============================
+# Pie Chart: Registered vs Casual
+# ===============================
+st.subheader("👥 Perbandingan Registered dan Casual")
+fig, ax = plt.subplots()
+data = [main_df_days["casual"].sum(), main_df_days["registered"].sum()]
+labels = ["Casual", "Registered"]
+ax.pie(data, labels=labels, autopct='%1.1f%%', colors=["#D3D3D3", "#72BCD4"], startangle=90)
+ax.axis("equal")
+st.pyplot(fig)
+
+# ===============================
+# Korelasi Humidity dan Peminjaman
+# ===============================
+st.subheader("💧 Pengaruh Kelembapan terhadap Peminjaman")
+fig, ax = plt.subplots(figsize=(18, 10))
+sns.regplot(data=main_df_days, x="humidity", y="count_rent", scatter_kws={"color": "#42A5F5"}, line_kws={"color": "red"}, ax=ax)
+ax.set_title("Korelasi Humidity dan Jumlah Peminjaman", fontsize=25)
+plt.tight_layout()
+st.pyplot(fig)
+
+# ===============================
+# Tren Peminjaman per Hari
+# ===============================
+st.subheader("📈 Tren Peminjaman Sepanjang Waktu")
+fig, ax = plt.subplots(figsize=(24, 6))
+ax.plot(main_df_days["dteday"], main_df_days["count_rent"], color="#90CAF9", linewidth=2)
+ax.scatter(main_df_days["dteday"], main_df_days["count_rent"], s=10, color="#90CAF9")
+ax.set_xlabel("Tanggal", fontsize=15)
+ax.set_ylabel("Jumlah Peminjaman", fontsize=15)
+ax.set_title("Tren Peminjaman Sepeda Harian", fontsize=25)
+plt.tight_layout()
+st.pyplot(fig)
+
+# ===============================
+# Segmentasi RFM
+# ===============================
+st.subheader("📊 Segmentasi Pengguna Berdasarkan RFM")
+
+main_df_hour["dteday"] = pd.to_datetime(main_df_hour["dteday"])
+current_date = main_df_hour['dteday'].max()
+
+rfm_df = main_df_hour.groupby('registered').agg({
+    'dteday': lambda x: (current_date - x.max()).days,
+    'instant': 'count',
+    'count_rent': 'sum'
+}).reset_index()
+
+rfm_df.columns = ['registered', 'Recency', 'Frequency', 'Monetary']
+rfm_df['R_Score'] = pd.qcut(rfm_df['Recency'], 3, labels=[3, 2, 1]).astype(int)
+rfm_df['F_Score'] = pd.qcut(rfm_df['Frequency'].rank(method='first'), 3, labels=[1, 2, 3]).astype(int)
+rfm_df['M_Score'] = pd.qcut(rfm_df['Monetary'].rank(method='first'), 3, labels=[1, 2, 3]).astype(int)
+rfm_df['RFM_Score'] = rfm_df['R_Score'].astype(str) + rfm_df['F_Score'].astype(str) + rfm_df['M_Score'].astype(str)
+
+def segment(row):
+    if row['RFM_Score'] == '333':
+        return 'Top Customer'
+    elif row['R_Score'] == 3:
+        return 'Loyal'
+    elif row['R_Score'] == 1 and row['F_Score'] <= 2:
+        return 'At Risk'
+    else:
+        return 'Others'
+
+rfm_df['Segment'] = rfm_df.apply(segment, axis=1)
+
+fig, ax = plt.subplots(figsize=(12, 8))
+sns.scatterplot(data=rfm_df, x='Recency', y='Frequency', size='Monetary',
+                hue='Segment', palette='Set2', sizes=(40, 300), alpha=0.8, ax=ax)
+ax.set_title('Visualisasi Segmentasi RFM Pengguna')
+ax.set_xlabel('Recency (Hari sejak terakhir menyewa)')
+ax.set_ylabel('Frequency (Jumlah penyewaan)')
+ax.grid(True)
+plt.tight_layout()
+st.pyplot(fig)
