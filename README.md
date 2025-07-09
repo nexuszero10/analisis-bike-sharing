@@ -36,4 +36,4 @@ Proyek ini bertujuan untuk menganalisis data pada Bike Sharing Dataset dari Wash
     cd bike-sharing-analisis/dashboard/
     streamlit run dashboard.py
     ```
-    Atau bisa dengan kunjungi website ini [Project Data Analytics]
+    Atau bisa dengan kunjungi website ini [Project Data Analytics] https://analysis-bike-rent.streamlit.app/
