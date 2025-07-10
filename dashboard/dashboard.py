@@ -10,6 +10,12 @@ sns.set(style='dark')
 st.set_page_config(layout="wide")
 
 # ===============================
+# Fungsi bantu
+# ===============================
+def format_ribuan(n):
+    return f"{n:,}".replace(",", ".")
+
+# ===============================
 # Fungsi pemrosesan data
 # ===============================
 def get_total_count_by_hour_df(hour_df):
@@ -68,11 +74,11 @@ st.markdown("Analisis peminjaman sepeda berdasarkan musim, cuaca, jam, dan peril
 # ===============================
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("Total Peminjaman", main_df_days["count_rent"].sum())
+    st.metric("Total Peminjaman", format_ribuan(main_df_days["count_rent"].sum()))
 with col2:
-    st.metric("Total Registered", main_df_days["registered"].sum())
+    st.metric("Total Registered", format_ribuan(main_df_days["registered"].sum()))
 with col3:
-    st.metric("Total Casual", main_df_days["casual"].sum())
+    st.metric("Total Casual", format_ribuan(main_df_days["casual"].sum()))
 
 # ===============================
 # Bar chart: Musim
@@ -111,7 +117,7 @@ sns.barplot(
     ax=ax
 )
 ax.set_title("Peminjaman Sepeda per Kondisi Cuaca", fontsize=35, fontweight='bold')
-ax.set_xlabel("Cuaca", fontsize=20)
+ax.set_xlabel("Cuaca (Clear, Mist, Light Rain/Snow, Heavy Rain/Snow)", fontsize=20)
 ax.set_ylabel("Jumlah Peminjaman", fontsize=20)
 plt.tight_layout()
 st.pyplot(fig)
@@ -125,6 +131,8 @@ sns.pointplot(data=main_df_hour, x="hours", y="count_rent", hue="category_days",
 ax.set_title("Peminjaman Sepeda Berdasarkan Hari dan Jam", fontsize=35)
 ax.set_xlabel("Jam", fontsize=20)
 ax.set_ylabel("Jumlah Peminjaman", fontsize=20)
+ax.set_xticks(range(0, 24))
+ax.set_xticklabels([f"{i}:00" for i in range(24)], rotation=45)
 plt.tight_layout()
 st.pyplot(fig)
 
@@ -148,6 +156,7 @@ fig, ax = plt.subplots()
 data = [main_df_days["casual"].sum(), main_df_days["registered"].sum()]
 labels = ["Casual", "Registered"]
 ax.pie(data, labels=labels, autopct='%1.1f%%', colors=["#D3D3D3", "#72BCD4"], startangle=90)
+ax.set_title("Distribusi Pengguna: Casual vs Registered", fontsize=20)
 ax.axis("equal")
 st.pyplot(fig)
 
@@ -206,12 +215,15 @@ def segment(row):
 
 rfm_df['Segment'] = rfm_df.apply(segment, axis=1)
 
-fig, ax = plt.subplots(figsize=(12, 8))
-sns.scatterplot(data=rfm_df, x='Recency', y='Frequency', size='Monetary',
-                hue='Segment', palette='Set2', sizes=(40, 300), alpha=0.8, ax=ax)
-ax.set_title('Visualisasi Segmentasi RFM Pengguna')
-ax.set_xlabel('Recency (Hari sejak terakhir menyewa)')
-ax.set_ylabel('Frequency (Jumlah penyewaan)')
-ax.grid(True)
-plt.tight_layout()
-st.pyplot(fig)
+if rfm_df.empty:
+    st.warning("Tidak ada data untuk segmentasi RFM pada rentang tanggal ini.")
+else:
+    fig, ax = plt.subplots(figsize=(12, 8))
+    sns.scatterplot(data=rfm_df, x='Recency', y='Frequency', size='Monetary',
+                    hue='Segment', palette='Set2', sizes=(40, 300), alpha=0.8, ax=ax)
+    ax.set_title('Visualisasi Segmentasi RFM Pengguna')
+    ax.set_xlabel('Recency (Hari sejak terakhir menyewa)')
+    ax.set_ylabel('Frequency (Jumlah penyewaan)')
+    ax.grid(True)
+    plt.tight_layout()
+    st.pyplot(fig)
