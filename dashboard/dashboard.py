@@ -33,8 +33,8 @@ def sum_of_weather(day_df):
 # ===============================
 # Load dan siapkan data
 # ===============================
-days_df = pd.read_csv("day_clean.csv")
-hours_df = pd.read_csv("hour_clean.csv")
+days_df = pd.read_csv("dashboard/day_clean.csv")
+hours_df = pd.read_csv("dashboard/hour_clean.csv")
 
 days_df["dteday"] = pd.to_datetime(days_df["dteday"])
 hours_df["dteday"] = pd.to_datetime(hours_df["dteday"])
